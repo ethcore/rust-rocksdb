@@ -375,6 +375,17 @@ impl Options {
         }
     }
 
+    pub fn set_universal_compaction_max_size_amplification_percent(&mut self,
+                                                                   percent: i32) {
+        unsafe {
+            let uco = rocksdb_ffi::rocksdb_universal_compaction_options_create();
+            rocksdb_ffi::rocksdb_universal_compaction_options_set_max_size_amplification_percent(
+                uco,
+                percent);
+            rocksdb_ffi::rocksdb_options_set_universal_compaction_options(self.inner, uco);
+        }
+    }
+
     pub fn set_parsed_options(&mut self, opts: &str) -> Result<(), String> {
         unsafe {
             let new_inner_options = rocksdb_ffi::rocksdb_options_create();

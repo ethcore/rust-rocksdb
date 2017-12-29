@@ -61,6 +61,9 @@ pub type DBComparator = *const DBComparatorOpaque;
 pub enum DBSliceTransformOpaque {}
 pub type DBSliceTransform = *const DBSliceTransformOpaque;
 
+pub enum DBUniversalCompactionOptionsOpaque {}
+pub type DBUniversalCompactionOptions = *const DBUniversalCompactionOptionsOpaque;
+
 pub const BLOCK_BASED_INDEX_TYPE_BINARY_SEARCH: c_int = 0;
 pub const BLOCK_BASED_INDEX_TYPE_HASH_SEARCH: c_int = 1;
 
@@ -195,6 +198,8 @@ extern "C" {
                                                         v: c_int);
     pub fn rocksdb_options_set_prefix_extractor(options: DBOptions,
                                                 slice_transform: DBSliceTransform);
+    pub fn rocksdb_options_set_universal_compaction_options(options: DBOptions,
+                                                            uco: DBUniversalCompactionOptions);
     pub fn rocksdb_filterpolicy_create_bloom(bits_per_key: c_int)
                                              -> DBFilterPolicy;
     pub fn rocksdb_filterpolicy_destroy(filter: DBFilterPolicy);
@@ -425,7 +430,7 @@ extern "C" {
                                       err: *mut *const i8);
     pub fn rocksdb_column_family_handle_destroy(column_family_handle: DBCFHandle);
 
-	// Slice transformation
+    // Slice transformation
     pub fn rocksdb_slicetransform_create(state: *mut c_void,
                                          destructor: Option<extern "C" fn(arg1: *mut c_void) -> ()>,
                                          transform: Option<extern "C" fn(arg1: *mut c_void,
@@ -446,6 +451,11 @@ extern "C" {
     pub fn rocksdb_slicetransform_create_fixed_prefix(size: size_t) -> DBSliceTransform;
     pub fn rocksdb_slicetransform_create_noop() -> DBSliceTransform;
     pub fn rocksdb_slicetransform_destroy(slice_transform: DBSliceTransform);
+
+    // Universal compaction
+    pub fn rocksdb_universal_compaction_options_create() -> DBUniversalCompactionOptions;
+    pub fn rocksdb_universal_compaction_options_set_max_size_amplification_percent(options: DBUniversalCompactionOptions,
+                                                                                   percent: c_int);
 
     pub fn rocksdb_get_options_from_string(base_options: DBOptions, opts: *const i8, new_options: DBOptions, err: *mut *const i8);
 }
