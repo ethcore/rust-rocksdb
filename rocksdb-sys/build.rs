@@ -45,7 +45,13 @@ fn main() {
 
     // Added to support old CPUs
     // see https://github.com/paritytech/parity-ethereum/issues/9684
-    cfg.define("PORTABLE", "ON");
+    let portable = match &*env::var("PORTABLE").unwrap_or("ON".to_owned()) {
+        "OFF" => false,
+        _ => true,
+    };
+    if portable {
+        cfg.define("PORTABLE", "ON");
+    }
 
     let out = cfg.build();
 
