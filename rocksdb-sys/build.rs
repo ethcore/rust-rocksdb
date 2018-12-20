@@ -18,11 +18,13 @@ fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS is set by cargo.");
     let target_env = env::var("CARGO_CFG_TARGET_ENV").expect("CARGO_CFG_TARGET_ENV is set by cargo.");
 
-    if target_env.contains("msvc") {
-        cfg.env("SNAPPY_INCLUDE", snappy);
-
+    if target_os.contains("windows") {
         println!("cargo:rustc-link-lib=dylib={}", "rpcrt4");
         println!("cargo:rustc-link-lib=dylib={}", "shlwapi");
+    }
+
+    if target_env.contains("msvc") {
+        cfg.env("SNAPPY_INCLUDE", snappy);
 
         let features = env::var("CARGO_CFG_TARGET_FEATURE")
             .expect("CARGO_CFG_TARGET_FEATURE is set by cargo.");
