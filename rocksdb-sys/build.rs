@@ -18,7 +18,14 @@ fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS is set by cargo.");
     let target_env = env::var("CARGO_CFG_TARGET_ENV").expect("CARGO_CFG_TARGET_ENV is set by cargo.");
 
+    if target_os.contains("ios") {
+        cfg.define("CMAKE_OSX_SYSROOT", "");
+        cfg.define("IOS_CROSS_COMPILE", "");
+    }
+
     if target_os.contains("windows") {
+        cfg.env("SNAPPY_INCLUDE", snappy);
+
         println!("cargo:rustc-link-lib=dylib={}", "rpcrt4");
         println!("cargo:rustc-link-lib=dylib={}", "shlwapi");
     }
@@ -64,7 +71,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=snappy");
 
     // https://github.com/alexcrichton/cc-rs/blob/ca70fd32c10f8cea805700e944f3a8d1f97d96d4/src/lib.rs#L891
-    if target_os.contains("macos") || target_os.contains("freebsd") || target_os.contains("openbsd") {
+    if target_os.contains("macos") || target_os.contains("ios") || target_os.contains("freebsd") || target_os.contains("openbsd") {
         println!("cargo:rustc-link-lib=c++");
     } else if !target_env.contains("msvc") && !target_os.contains("android") {
         println!("cargo:rustc-link-lib=stdc++");

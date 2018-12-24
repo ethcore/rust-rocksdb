@@ -2706,14 +2706,16 @@ void DBImpl::EraseThreadStatusDbInfo() const {}
 
 //
 // A global method that can dump out the build version
-void DumpRocksDBBuildVersion(Logger* log) {
 #if !defined(IOS_CROSS_COMPILE)
+void DumpRocksDBBuildVersion(Logger* log) {
   // if we compile with Xcode, we don't run build_detect_version, so we don't
   // generate util/build_version.cc
   ROCKS_LOG_HEADER(log, "RocksDB version: %d.%d.%d\n", ROCKSDB_MAJOR,
                    ROCKSDB_MINOR, ROCKSDB_PATCH);
   ROCKS_LOG_HEADER(log, "Git sha %s", rocksdb_build_git_sha);
   ROCKS_LOG_HEADER(log, "Compile date %s", rocksdb_build_compile_date);
+#else
+void DumpRocksDBBuildVersion(Logger* log __attribute__((__unused__))) {
 #endif
 }
 
