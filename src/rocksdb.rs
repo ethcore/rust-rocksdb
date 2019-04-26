@@ -512,6 +512,70 @@ impl DB {
         }
     }
 
+    /// Query a RocksDB instance for a "property" that returns a numeric value. The available
+    /// properties are listed
+    /// [here](https://github.com/facebook/rocksdb/blob/fefd4b98c572a09da47fb100da9e1472d28c0d08/include/rocksdb/db.h#L522)
+    /// but note that only properties returning a numeric value can be queried using this function.
+    pub fn get_int_property(&self, prop: &str) -> u64 {
+        let mut value = 0u64;
+        let prop = CString::new(prop).expect("Rust &str is checked by the compiler");
+        unsafe {
+            rocksdb_ffi::rocksdb_property_int(
+                self.inner,
+                prop.as_ptr(),
+                &mut value,
+            );
+        }
+        value
+    }
+
+    /// Query a RocksDB instance scoped to a column family for a "property" that returns a numeric
+    /// value. The available properties are listed
+    /// [here](https://github.com/facebook/rocksdb/blob/fefd4b98c572a09da47fb100da9e1472d28c0d08/include/rocksdb/db.h#L522)
+    /// but note that only properties returning a numeric value can be queried using this function.
+    pub fn get_int_property_cf(&self, cf: Column , prop: &str) -> u64 {
+        let string_value = self.get_property_value_cf(cf, prop);
+        string_value.parse::<u64>().unwrap_or(0)
+    }
+
+    /// Query a RocksDB instance for a "property" value. The available properties are listed
+    /// [here](https://github.com/facebook/rocksdb/blob/fefd4b98c572a09da47fb100da9e1472d28c0d08/include/rocksdb/db.h#L522)
+    pub fn get_property_value(&self, prop: &str) -> String {
+        use std::ffi;
+        let prop= CString::new(prop).expect("Rust &str is checked by the compiler");
+        unsafe {
+            let propval= rocksdb_ffi::rocksdb_property_value(
+                self.inner,
+                prop.as_ptr()
+            );
+            if propval.is_null() {
+                return String::new();
+            }
+            let c_buf = ffi::CStr::from_ptr(propval);
+            c_buf.to_string_lossy().into_owned()
+        }
+    }
+
+    /// Query a RocksDB instance scoped to a column family for a "property" value. The available
+    /// properties are listed
+    /// [here](https://github.com/facebook/rocksdb/blob/fefd4b98c572a09da47fb100da9e1472d28c0d08/include/rocksdb/db.h#L522)
+    pub fn get_property_value_cf(&self, cf: Column, prop: &str) -> String {
+        use std::ffi;
+        let prop = CString::new(prop).expect("Rust &str is checked by the compiler");
+        unsafe {
+            let propval = rocksdb_ffi::rocksdb_property_value_cf(
+                self.inner,
+                cf.inner,
+                prop.as_ptr(),
+            );
+            if propval.is_null() {
+                return String::new();
+            }
+            let c_buf = ffi::CStr::from_ptr(propval);
+            c_buf.to_string_lossy().into_owned()
+        }
+    }
+
     pub fn get(&self, key: &[u8]) -> Result<Option<DBVector>, String> {
         self.get_opt(key, &ReadOptions::new())
     }
@@ -994,11 +1058,26 @@ impl DBVector {
     }
 }
 
-#[test]
-fn external() {
-    let path = "_rust_rocksdb_externaltest";
-    {
-        let db = DB::open_default(path).unwrap();
+
+#[cfg(test)]
+mod tests {
+    extern crate tempdir;
+
+    use self::tempdir::TempDir;
+    use super::*;
+    const NUM_KEYS: &str = "rocksdb.estimate-num-keys";
+    const MEM_TAB_SIZE: &str = "rocksdb.cur-size-active-mem-table";
+    const LEVELSTATS: &str = "rocksdb.levelstats";
+
+    fn db(prefix: &str) -> DB {
+        let path = TempDir::new(prefix).unwrap();
+        let path = path.path().to_str().unwrap();
+        DB::open_default(path).unwrap()
+    }
+
+    #[test]
+    fn external() {
+        let db = db("rust_rocksdb_externaltest");
         let p = db.put(b"k1", b"v1111");
         assert!(p.is_ok());
         let r: Result<Option<DBVector>, String> = db.get(b"k1");
@@ -1006,42 +1085,119 @@ fn external() {
         assert!(db.delete(b"k1").is_ok());
         assert!(db.get(b"k1").unwrap().is_none());
     }
-    let opts = Options::new();
-    let result = DB::destroy(&opts, path);
-    assert!(result.is_ok());
-}
 
-#[test]
-fn errors_do_stuff() {
-    let path = "_rust_rocksdb_error";
-    let opts = Options::new();
-    {
-        let _db = DB::open_default(path).unwrap();
-        // The DB will still be open when we try to destroy and the lock should fail
-        match DB::destroy(&opts, path) {
-            Err(ref s) => {
-                let msg = if cfg!(target_env = "msvc") {
-                    "IO error: Failed to create lock file: _rust_rocksdb_error/LOCK: \
-                     The process cannot access the file because it is being used by another process."
-                } else {
-                    "IO error: While lock file: _rust_rocksdb_error/LOCK: \
-                     No locks available"
-                };
+    #[test]
+    fn get_int_property_with_valid_propname() {
+        let db = db("get_int_property_valid");
 
-                assert_eq!(s.trim(), msg)
-            }
-            Ok(_) => panic!("should fail"),
-        }
+        assert_eq!(db.get_int_property(NUM_KEYS), 0);
+        let init_size = db.get_int_property(MEM_TAB_SIZE);
+        assert!(init_size > 0);
+
+        db.put(b"key1", b"val1").unwrap();
+        db.put(b"key2", b"val2").unwrap();
+        db.put(b"key3", b"val3").unwrap();
+        assert_eq!(db.get_int_property(NUM_KEYS), 3);
+
+        assert!(db.get_int_property(MEM_TAB_SIZE) > init_size);
     }
-    let result = DB::destroy(&opts, path);
-    assert!(result.is_ok());
-}
 
-#[test]
-fn writebatch_works() {
-    let path = "_rust_rocksdb_writebacktest";
-    {
-        let db = DB::open_default(path).unwrap();
+    #[test]
+    fn get_int_property_with_invalid_propname() {
+        let db = db("get_int_property_invalid");
+
+        assert_eq!(db.get_int_property("rocksdb.no-such-prop"), 0);
+        assert_eq!(db.get_int_property(LEVELSTATS), 0);
+    }
+
+    #[test]
+    fn get_property_with_valid_propname() {
+        let db = db("get_property_valid");
+
+        assert_eq!(db.get_property_value(NUM_KEYS), "0");
+        assert_eq!(db.get_property_value(LEVELSTATS), "Level Files Size(MB)\n--------------------\n  0        0        0\n  1        0        0\n  2        0        0\n  3        0        0\n  4        0        0\n  5        0        0\n  6        0        0\n");
+    }
+
+    #[test]
+    fn get_property_with_invalid_propname() {
+        let db = db("get_property_invalid");
+
+        assert_eq!(db.get_property_value("rocksdb.no-such-property"), "");
+    }
+
+    #[test]
+    fn get_int_property_cf_with_valid_propname() {
+        let path = TempDir::new("get_int_property_cf_valid").unwrap();
+        let path = path.path().to_str().unwrap();
+        let mut db = DB::open_default(path).unwrap();
+        let cf = db.create_cf("mycol", &Options::new()).unwrap();
+        let cf2 = db.create_cf("othermycol", &Options::new()).unwrap();
+
+        assert_eq!(db.get_int_property_cf(cf,NUM_KEYS), 0);
+        let init_size = db.get_int_property_cf(cf,MEM_TAB_SIZE);
+        assert!(init_size > 0);
+
+        db.put(b"key1", b"val1").unwrap();
+        db.put_cf(cf,b"key2", b"val2").unwrap();
+        db.put_cf(cf,b"key3", b"val3").unwrap();
+        assert_eq!(db.get_int_property(NUM_KEYS), 1);
+        assert_eq!(db.get_int_property_cf(cf,NUM_KEYS), 2);
+        assert_eq!(db.get_int_property_cf(cf2,NUM_KEYS), 0);
+
+        assert!(db.get_int_property_cf(cf,MEM_TAB_SIZE) > init_size);
+    }
+
+    #[test]
+    fn get_int_property_cf_with_invalid_propname() {
+        let path = TempDir::new("get_int_property_cf_invalid").unwrap();
+        let path = path.path().to_str().unwrap();
+        let mut db = DB::open_default(path).unwrap();
+        let cf = db.create_cf("mycol", &Options::new()).unwrap();
+
+        assert_eq!(db.get_int_property_cf(cf, "rocksdb.no-such-prop"), 0);
+        assert_eq!(db.get_int_property_cf(cf, LEVELSTATS), 0);
+    }
+
+    #[test]
+    fn get_property_cf_with_valid_propname() {
+        let path = TempDir::new("get_property_cf_invalid").unwrap();
+        let path = path.path().to_str().unwrap();
+        let mut db = DB::open_default(path).unwrap();
+        let cf = db.create_cf("mycol", &Options::new()).unwrap();
+
+        assert_eq!(db.get_property_value_cf(cf, NUM_KEYS), "0");
+        assert_eq!(db.get_property_value_cf(cf,LEVELSTATS), "Level Files Size(MB)\n--------------------\n  0        0        0\n  1        0        0\n  2        0        0\n  3        0        0\n  4        0        0\n  5        0        0\n  6        0        0\n");
+    }
+
+    #[test]
+    fn errors_do_stuff() {
+        let path = "_rust_rocksdb_error";
+        let opts = Options::new();
+        {
+            let _db = DB::open_default(path).unwrap();
+            // The DB will still be open when we try to destroy and the lock should fail
+            match DB::destroy(&opts, path) {
+                Err(ref s) => {
+                    let msg = if cfg!(target_env = "msvc") {
+                        "IO error: Failed to create lock file: _rust_rocksdb_error/LOCK: \
+                         The process cannot access the file because it is being used by another process."
+                    } else {
+                        "IO error: While lock file: _rust_rocksdb_error/LOCK: \
+                         No locks available"
+                    };
+
+                    assert_eq!(s.trim(), msg)
+                }
+                Ok(_) => panic!("should fail"),
+            }
+        }
+        let result = DB::destroy(&opts, path);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn writebatch_works() {
+        let db = db("_rust_rocksdb_writebacktest");
         {
             // test put
             let batch = WriteBatch::new();
@@ -1062,15 +1218,10 @@ fn writebatch_works() {
             assert!(db.get(b"k1").unwrap().is_none());
         }
     }
-    let opts = Options::new();
-    assert!(DB::destroy(&opts, path).is_ok());
-}
 
-#[test]
-fn iterator_test() {
-    let path = "_rust_rocksdb_iteratortest";
-    {
-        let db = DB::open_default(path).unwrap();
+    #[test]
+    fn iterator_test() {
+        let db = db("_rust_rocksdb_iteratortest");
         let p = db.put(b"k1", b"v1111");
         assert!(p.is_ok());
         let p = db.put(b"k2", b"v2222");
@@ -1084,29 +1235,24 @@ fn iterator_test() {
                      from_utf8(&*v).unwrap());
         }
     }
-    let opts = Options::new();
-    assert!(DB::destroy(&opts, path).is_ok());
-}
 
-#[test]
-fn non_ascii_path_test() {
-    let path = "ÇéæåÑëê/_rust_rocksdb_unicode_test";
-    {
-        let db = DB::open_default(path).unwrap();
-        assert!(db.put(b"my key", b"my value").is_ok());
-        assert!(db.delete(b"my key").is_ok());
+    #[test]
+    fn non_ascii_path_test() {
+        let path = "ÇéæåÑëê/_rust_rocksdb_unicode_test";
+        {
+            let db = DB::open_default(path).unwrap();
+            assert!(db.put(b"my key", b"my value").is_ok());
+            assert!(db.delete(b"my key").is_ok());
+        }
+        let opts = Options::new();
+        assert!(DB::destroy(&opts, path).is_ok());
+        // db::destroy will only remove the innermost directory
+        fs::remove_dir("ÇéæåÑëê").unwrap();
     }
-    let opts = Options::new();
-    assert!(DB::destroy(&opts, path).is_ok());
-    // db::destroy will only remove the innermost directory
-    fs::remove_dir("ÇéæåÑëê").unwrap();
-}
 
-#[test]
-fn snapshot_test() {
-    let path = "_rust_rocksdb_snapshottest";
-    {
-        let db = DB::open_default(path).unwrap();
+    #[test]
+    fn snapshot_test() {
+        let db = db("_rust_rocksdb_snapshottest");
         let p = db.put(b"k1", b"v1111");
         assert!(p.is_ok());
 
@@ -1120,12 +1266,10 @@ fn snapshot_test() {
         assert!(db.get(b"k2").unwrap().is_some());
         assert!(snap.get(b"k2").unwrap().is_none());
     }
-    let opts = Options::new();
-    assert!(DB::destroy(&opts, path).is_ok());
-}
 
-#[test]
-fn options() {
-    let mut opts = Options::new();
-    assert!(opts.set_parsed_options("rate_limiter_bytes_per_sec=1024").is_ok());
+    #[test]
+    fn options() {
+        let mut opts = Options::new();
+        assert!(opts.set_parsed_options("rate_limiter_bytes_per_sec=1024").is_ok());
+    }
 }

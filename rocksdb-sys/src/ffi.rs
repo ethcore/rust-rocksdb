@@ -448,6 +448,23 @@ extern "C" {
     pub fn rocksdb_slicetransform_destroy(slice_transform: DBSliceTransform);
 
     pub fn rocksdb_get_options_from_string(base_options: DBOptions, opts: *const i8, new_options: DBOptions, err: *mut *const i8);
+
+    pub fn rocksdb_property_int(
+        db: DBInstance,
+        prop: *const c_char,
+        value: *mut u64
+    ) -> c_int;
+
+    pub fn rocksdb_property_value(
+        db: DBInstance,
+        prop: *const c_char,
+    ) -> *const c_char;
+
+    pub fn rocksdb_property_value_cf(
+        db: DBInstance,
+        cf: DBCFHandle,
+        prop: *const c_char,
+    ) -> *const c_char;
 }
 
 #[test]

@@ -111,7 +111,7 @@ fn custom_merge() {
             Err(e) => println!("error retrieving value: {}", e),
         }
     }
-    DB::destroy(&opts, path).is_ok();
+    let _ = DB::destroy(&opts, path).is_ok();
 }
 
 #[cfg(feature = "valgrind")]
@@ -143,37 +143,37 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use rocksdb::{BlockBasedOptions, DB, Options};
-    use rocksdb::DBCompactionStyle::DBUniversalCompaction;
-
-    fn tuned_for_somebody_elses_disk(path: &str,
-                                     opts: &mut Options,
-                                     blockopts: &mut BlockBasedOptions)
-                                     -> DB {
-        opts.create_if_missing(true);
-        opts.set_max_open_files(10000);
-        opts.set_use_fsync(false);
-        opts.set_bytes_per_sync(8388608);
-        opts.set_block_cache_size_mb(1024);
-        opts.set_table_cache_num_shard_bits(6);
-        opts.set_max_write_buffer_number(32);
-        opts.set_write_buffer_size(536870912);
-        opts.set_target_file_size_base(1073741824);
-        opts.set_min_write_buffer_number_to_merge(4);
-        opts.set_level_zero_stop_writes_trigger(2000);
-        opts.set_level_zero_slowdown_writes_trigger(0);
-        opts.set_compaction_style(DBUniversalCompaction);
-        opts.set_max_background_compactions(4);
-        opts.set_max_background_flushes(4);
-        blockopts.set_block_size(524288);
-        opts.set_block_based_table_factory(blockopts);
-        opts.set_disable_auto_compactions(true);
-
-        // let filter = new_bloom_filter(10);
-        // opts.set_filter(filter);
-
-        DB::open(&opts, path).unwrap()
-    }
+//    use rocksdb::{BlockBasedOptions, DB, Options};
+//    use rocksdb::DBCompactionStyle::DBUniversalCompaction;
+//
+//    fn tuned_for_somebody_elses_disk(path: &str,
+//                                     opts: &mut Options,
+//                                     blockopts: &mut BlockBasedOptions)
+//                                     -> DB {
+//        opts.create_if_missing(true);
+//        opts.set_max_open_files(10000);
+//        opts.set_use_fsync(false);
+//        opts.set_bytes_per_sync(8388608);
+//        opts.set_block_cache_size_mb(1024);
+//        opts.set_table_cache_num_shard_bits(6);
+//        opts.set_max_write_buffer_number(32);
+//        opts.set_write_buffer_size(536870912);
+//        opts.set_target_file_size_base(1073741824);
+//        opts.set_min_write_buffer_number_to_merge(4);
+//        opts.set_level_zero_stop_writes_trigger(2000);
+//        opts.set_level_zero_slowdown_writes_trigger(0);
+//        opts.set_compaction_style(DBUniversalCompaction);
+//        opts.set_max_background_compactions(4);
+//        opts.set_max_background_flushes(4);
+//        blockopts.set_block_size(524288);
+//        opts.set_block_based_table_factory(blockopts);
+//        opts.set_disable_auto_compactions(true);
+//
+//        // let filter = new_bloom_filter(10);
+//        // opts.set_filter(filter);
+//
+//        DB::open(&opts, path).unwrap()
+//    }
 
     // TODO(tyler) unstable
     // #[bench]
