@@ -533,6 +533,8 @@ impl DB {
     /// value. The available properties are listed
     /// [here](https://github.com/facebook/rocksdb/blob/fefd4b98c572a09da47fb100da9e1472d28c0d08/include/rocksdb/db.h#L522)
     /// but note that only properties returning a numeric value can be queried using this function.
+    // TODO: replace with proper call to `rocks_ffi::rocksdb_property_value_cf` when it becomes available.
+    //       See: https://github.com/facebook/rocksdb/pull/5268
     pub fn get_int_property_cf(&self, cf: Column , prop: &str) -> u64 {
         let string_value = self.get_property_value_cf(cf, prop);
         string_value.parse::<u64>().unwrap_or(0)
