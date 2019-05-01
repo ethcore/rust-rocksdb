@@ -13,12 +13,7 @@ exclude = [
   "test/**/*",
 ]
 
-[features]
-default=[]
-valgrind=[]
-
 [[test]]
-
 name = "test"
 path = "test/test.rs"
 
