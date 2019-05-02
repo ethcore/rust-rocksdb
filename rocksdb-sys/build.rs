@@ -24,8 +24,6 @@ fn main() {
     }
 
     if target_os.contains("windows") {
-        cfg.env("SNAPPY_INCLUDE", snappy);
-
         println!("cargo:rustc-link-lib=dylib={}", "rpcrt4");
         println!("cargo:rustc-link-lib=dylib={}", "shlwapi");
     }
